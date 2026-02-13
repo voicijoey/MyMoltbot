@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>你画我猜</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }
+
+  header {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff; text-align: center; padding: 14px 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  }
+  header h1 { font-size: 24px; letter-spacing: 4px; }
+
+  .container {
+    display: flex; flex: 1; padding: 16px; gap: 16px; max-width: 1200px;
+    width: 100%; margin: 0 auto; min-height: 0;
+  }
+
+  /* ---- 画板区 ---- */
+  .canvas-panel {
+    flex: 1; display: flex; flex-direction: column; background: #fff;
+    border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.08); padding: 12px;
+  }
+  .toolbar {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;
+  }
+  .toolbar label { font-size: 13px; color: #555; }
+  .color-btn {
+    width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent;
+    cursor: pointer; transition: transform .15s, border-color .15s;
+  }
+  .color-btn:hover { transform: scale(1.15); }
+  .color-btn.active { border-color: #333; transform: scale(1.15); }
+
+  #brushSize { width: 100px; accent-color: #667eea; }
+  .tool-btn {
+    padding: 6px 14px; border: 1px solid #ddd; border-radius: 6px; background: #fafafa;
+    cursor: pointer; font-size: 13px; color: #444; transition: background .2s, color .2s;
+  }
+  .tool-btn:hover { background: #667eea; color: #fff; border-color: #667eea; }
+  .tool-btn.active { background: #764ba2; color: #fff; border-color: #764ba2; }
+
+  canvas {
+    flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; cursor: crosshair;
+    background: #fff;
+  }
+
+  /* ---- 聊天区 ---- */
+  .chat-panel {
+    width: 320px; display: flex; flex-direction: column; background: #fff;
+    border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.08); padding: 12px;
+  }
+  .chat-panel h2 { font-size: 16px; color: #555; margin-bottom: 8px; text-align: center; }
+  .chat-messages {
+    flex: 1; overflow-y: auto; border: 1px solid #eee; border-radius: 8px;
+    padding: 10px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px;
+    background: #fafafa;
+  }
+  .msg { padding: 6px 10px; border-radius: 8px; font-size: 14px; max-width: 90%; word-break: break-word; }
+  .msg.system { align-self: center; background: #e8e8e8; color: #888; font-size: 12px; }
+  .msg.user { align-self: flex-end; background: #667eea; color: #fff; }
+
+  .chat-input {
+    display: flex; gap: 8px;
+  }
+  .chat-input input {
+    flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px;
+    outline: none; font-size: 14px;
+  }
+  .chat-input input:focus { border-color: #667eea; }
+  .chat-input button {
+    padding: 8px 16px; background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;
+    transition: opacity .2s;
+  }
+  .chat-input button:hover { opacity: .85; }
+
+  /* 词语提示 */
+  .word-bar {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    margin-bottom: 8px;
+  }
+  .word-display {
+    font-size: 18px; font-weight: bold; color: #764ba2; letter-spacing: 2px;
+    background: #f5f0ff; padding: 4px 16px; border-radius: 8px;
+  }
+  #newWordBtn {
+    padding: 4px 12px; font-size: 12px; border: 1px solid #764ba2; background: #fff;
+    color: #764ba2; border-radius: 6px; cursor: pointer;
+  }
+  #newWordBtn:hover { background: #764ba2; color: #fff; }
+</style>
+</head>
+<body>
+
+<header><h1>你画我猜</h1></header>
+
+<div class="container">
+  <!-- 画板 -->
+  <div class="canvas-panel">
+    <div class="word-bar">
+      <span>当前词语：</span>
+      <span class="word-display" id="currentWord">苹果</span>
+      <button id="newWordBtn">换一个</button>
+    </div>
+
+    <div class="toolbar">
+      <label>画笔颜色：</label>
+      <span class="color-btn active" data-color="#000000" style="background:#000"></span>
+      <span class="color-btn" data-color="#e74c3c" style="background:#e74c3c"></span>
+      <span class="color-btn" data-color="#e67e22" style="background:#e67e22"></span>
+      <span class="color-btn" data-color="#f1c40f" style="background:#f1c40f"></span>
+      <span class="color-btn" data-color="#2ecc71" style="background:#2ecc71"></span>
+      <span class="color-btn" data-color="#3498db" style="background:#3498db"></span>
+      <span class="color-btn" data-color="#9b59b6" style="background:#9b59b6"></span>
+
+      <label style="margin-left:12px">粗细：</label>
+      <input type="range" id="brushSize" min="1" max="20" value="3">
+      <span id="sizeLabel" style="font-size:13px;color:#555;">3</span>
+
+      <button class="tool-btn" id="eraserBtn">橡皮擦</button>
+      <button class="tool-btn" id="clearBtn">清空画板</button>
+      <button class="tool-btn" id="undoBtn">撤销</button>
+    </div>
+
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <!-- 聊天 -->
+  <div class="chat-panel">
+    <h2>猜一猜</h2>
+    <div class="chat-messages" id="messages">
+      <div class="msg system">游戏开始！请根据画板内容猜词</div>
+    </div>
+    <div class="chat-input">
+      <input type="text" id="guessInput" placeholder="输入你的猜测..." maxlength="20">
+      <button id="sendBtn">发送</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- 词库 ----
+const words = [
+  "苹果","香蕉","太阳","月亮","星星","房子","汽车","飞机","猫咪","小狗",
+  "花朵","大树","雨伞","眼镜","手机","电脑","篮球","足球","蛋糕","冰淇淋",
+  "西瓜","葡萄","熊猫","兔子","老虎","大象","长颈鹿","蝴蝶","蜗牛","鲨鱼",
+  "火箭","自行车","帽子","书本","钢琴","吉他","雪人","闪电","彩虹","钻石",
+  "钥匙","灯泡","时钟","剪刀","铅笔","气球","蜡烛","望远镜","机器人","沙漏"
+];
+
+let currentWord = "苹果";
+const wordEl = document.getElementById("currentWord");
+const newWordBtn = document.getElementById("newWordBtn");
+
+function pickWord() {
+  let w;
+  do { w = words[Math.floor(Math.random() * words.length)]; } while (w === currentWord && words.length > 1);
+  currentWord = w;
+  wordEl.textContent = currentWord;
+  addSystemMsg("新一轮开始，请画：" + currentWord);
+}
+newWordBtn.addEventListener("click", pickWord);
+
+// ---- Canvas ----
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const toolbarH = canvas.previousElementSibling.offsetHeight + canvas.previousElementSibling.previousElementSibling.offsetHeight + 28;
+  canvas.width = rect.width - 24;
+  canvas.height = rect.height - toolbarH;
+  redraw();
+}
+window.addEventListener("resize", resize);
+setTimeout(resize, 0);
+
+let drawing = false;
+let eraser = false;
+let brushColor = "#000000";
+let brushSize = 3;
+let history = [];   // 保存每一笔的图像数据
+let currentPath = [];
+
+function saveState() {
+  history.push(canvas.toDataURL());
+  if (history.length > 30) history.shift();
+}
+
+function redraw() {
+  if (history.length) {
+    const img = new Image();
+    img.onload = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); };
+    img.src = history[history.length - 1];
+  }
+}
+
+canvas.addEventListener("pointerdown", e => {
+  drawing = true;
+  saveState();
+  ctx.beginPath();
+  ctx.moveTo(e.offsetX, e.offsetY);
+  canvas.setPointerCapture(e.pointerId);
+});
+
+canvas.addEventListener("pointermove", e => {
+  if (!drawing) return;
+  ctx.lineWidth = brushSize;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  if (eraser) {
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.strokeStyle = "rgba(0,0,0,1)";
+  } else {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = brushColor;
+  }
+  ctx.lineTo(e.offsetX, e.offsetY);
+  ctx.stroke();
+});
+
+canvas.addEventListener("pointerup", () => { drawing = false; });
+canvas.addEventListener("pointerleave", () => { drawing = false; });
+
+// 颜色
+document.querySelectorAll(".color-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".color-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    brushColor = btn.dataset.color;
+    eraser = false;
+    document.getElementById("eraserBtn").classList.remove("active");
+  });
+});
+
+// 粗细
+const sizeInput = document.getElementById("brushSize");
+const sizeLabel = document.getElementById("sizeLabel");
+sizeInput.addEventListener("input", () => { brushSize = +sizeInput.value; sizeLabel.textContent = brushSize; });
+
+// 橡皮擦
+const eraserBtn = document.getElementById("eraserBtn");
+eraserBtn.addEventListener("click", () => {
+  eraser = !eraser;
+  eraserBtn.classList.toggle("active", eraser);
+  canvas.style.cursor = eraser ? "cell" : "crosshair";
+});
+
+// 清空
+document.getElementById("clearBtn").addEventListener("click", () => {
+  saveState();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+});
+
+// 撤销
+document.getElementById("undoBtn").addEventListener("click", () => {
+  if (!history.length) return;
+  const prev = history.pop();
+  const img = new Image();
+  img.onload = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); };
+  img.src = prev;
+});
+
+// ---- 聊天 ----
+const messagesEl = document.getElementById("messages");
+const guessInput = document.getElementById("guessInput");
+
+function addSystemMsg(text) {
+  const d = document.createElement("div");
+  d.className = "msg system";
+  d.textContent = text;
+  messagesEl.appendChild(d);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function sendGuess() {
+  const text = guessInput.value.trim();
+  if (!text) return;
+  const d = document.createElement("div");
+  d.className = "msg user";
+  d.textContent = text;
+  messagesEl.appendChild(d);
+  guessInput.value = "";
+
+  if (text === currentWord) {
+    addSystemMsg("🎉 恭喜你，猜对了！答案就是「" + currentWord + "」");
+    setTimeout(pickWord, 1500);
+  } else {
+    addSystemMsg("猜错了，再想想~");
+  }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+document.getElementById("sendBtn").addEventListener("click", sendGuess);
+guessInput.addEventListener("keydown", e => { if (e.key === "Enter") sendGuess(); });
+</script>
+</body>
+</html>
